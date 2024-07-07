@@ -24,28 +24,43 @@ def update_route53_record(zone_id, record_name, record_type, new_value, credenti
         )
         client = session.client('route53')
 
-        # Prepare the change batch request
-        change_batch = {
-            'Comment': 'Updating record via script',
-            'Changes': [
-                {
-                    'Action': 'UPSERT',
-                    'ResourceRecordSet': {
-                        'Name': record_name,
-                        'Type': record_type,
-                        'TTL': ttl,
-                        'ResourceRecords': [{'Value': new_value}],
-                    }
-                }
-            ]
-        }
-        
-        # Update the record
-        response = client.change_resource_record_sets(
+        response = client.list_resource_record_sets(
             HostedZoneId=zone_id,
-            ChangeBatch=change_batch
+            StartRecordName=record_name,
+            StartRecordType=record_type,
+            MaxItems='1'
         )
-        
+
+        for record in response['ResourceRecordSets']:
+            if record['Name'] == (record_name + "."):
+                print(record)
+                if record['ResourceRecords'][0]['Value'] == new_value:
+                    print("IP has not changed, no update required")
+                else:
+                    print("IP has changed, performing update")
+
+                    # Prepare the change batch request
+                    change_batch = {
+                        'Comment': 'Updating record via script',
+                        'Changes': [
+                            {
+                                'Action': 'UPSERT',
+                                'ResourceRecordSet': {
+                                    'Name': record_name,
+                                    'Type': record_type,
+                                    'TTL': ttl,
+                                    'ResourceRecords': [{'Value': new_value}],
+                                }
+                            }
+                        ]
+                    }
+                
+                    # Update the record
+                    response = client.change_resource_record_sets(
+                        HostedZoneId=zone_id,
+                        ChangeBatch=change_batch
+                    )
+                
         return response
     except NoCredentialsError:
         print("Credentials not available")
